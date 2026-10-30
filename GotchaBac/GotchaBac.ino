@@ -1,8 +1,9 @@
 #include <SPI.h> 
 #include <TFT_eSPI.h> 
 #include <XPT2046_Touchscreen.h> 
+#include "pet_images.h"
 
-// Initialize TFT screen (Landscape mode 320x240) 
+// Initialize TFT screen (Portrait mode 240x320) 
 TFT_eSPI tft = TFT_eSPI();  
 
 // Touch Screen Pin Definitions for Cheap Yellow Display (CYD) 
@@ -35,17 +36,17 @@ void setup() {
   // Initialize Touch Controller on HSPI bus 
   touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS); 
   ts.begin(touchscreenSPI); 
-  ts.setRotation(1); // Match landscape orientation 
+  ts.setRotation(0); // Match portrait orientation 
 
   // Initialize the TFT screen 
   tft.init(); 
-  tft.setRotation(1); // Landscape mode (320x240 pixels) 
+  tft.setRotation(0); // Portrait mode (240x320 pixels) 
   tft.fillScreen(TFT_BLACK); 
 
   // Boot Screen 
   tft.setTextColor(TFT_WHITE, TFT_BLACK); 
-  tft.setTextSize(2); 
-  tft.setCursor(45, 110); 
+  tft.setTextSize(1); 
+  tft.setCursor(48, 155); 
   tft.print("Tamagotchi Booting..."); 
   delay(2000); 
   tft.fillScreen(TFT_BLACK); 
@@ -67,15 +68,15 @@ void loop() {
     Serial.print("Touch Raw -> X: "); Serial.print(p.x);
     Serial.print(" | Y: "); Serial.println(p.y);
 
-    // Map raw touch coordinates to 320x240 landscape screen coordinates 
-    int pixelX = map(p.y, 200, 3800, 0, 320); 
-    int pixelY = map(p.x, 3800, 200, 0, 240); 
+    // Map raw touch coordinates to 240x320 portrait screen coordinates
+    int pixelX = map(p.x, 200, 3800, 0, 240);
+    int pixelY = map(p.y, 200, 3800, 0, 320); 
 
     Serial.print("Mapped -> X: "); Serial.print(pixelX);
     Serial.print(" | Y: "); Serial.println(pixelY);
 
-    // Check if touch is inside the RESET button bounds (X: 180-240, Y: 60-180) 
-    if (pixelX >= 180 && pixelX <= 240 && pixelY >= 60 && pixelY <= 180) { 
+    // Check if touch is inside the portrait RESET button bounds (X: 45-195, Y: 150-195)
+    if (pixelX >= 45 && pixelX <= 195 && pixelY >= 150 && pixelY <= 195) { 
       Serial.println("RESET TRIGGERED!");
       
       // Reset all game stats 
@@ -147,71 +148,70 @@ void loop() {
     }
   }
 
-  // 4. Render Dynamic UI across the full 320x240 screen 
+  // 4. Render Dynamic UI across the full 240x320 portrait screen 
   updateUI(voltage, rawValue); 
    
   delay(100); 
 } 
 
-void drawStaticUI() { 
-  // Draw full screen outer border box 
-  tft.drawRect(5, 5, 310, 230, TFT_DARKGREY); 
-   
-  // Header and Footer Divider Lines 
-  tft.drawFastHLine(5, 40, 310, TFT_DARKGREY); 
-  tft.drawFastHLine(5, 190, 310, TFT_DARKGREY); 
-   
-  // Static labels for the bottom status bars 
-  tft.setTextSize(1); 
-  tft.setTextColor(TFT_WHITE, TFT_BLACK); 
-   
-  tft.setCursor(15, 200); 
-  tft.print("HGR:"); 
-   
-  tft.setCursor(115, 200); 
-  tft.print("HPS:"); 
-   
-  tft.setCursor(215, 200); 
-  tft.print("HLT:"); 
-} 
+void drawStaticUI() {
+  // Portrait layout for a 240x320 display.
+  tft.drawRect(5, 5, 230, 310, TFT_DARKGREY);
+  tft.drawFastHLine(5, 42, 230, TFT_DARKGREY);
+  tft.drawFastHLine(5, 165, 230, TFT_DARKGREY);
+  tft.drawFastHLine(5, 282, 230, TFT_DARKGREY);
 
-void updateUI(float sensorVoltage, int rawValue) { 
-  // Update State Header across the top 
-  tft.setTextSize(2); 
-  if (isDead) { 
-    tft.setTextColor(TFT_RED, TFT_BLACK); 
-  } else if (rawValue > 850) { 
-    tft.setTextColor(TFT_GREEN, TFT_BLACK); 
-  } else if (rawValue > 650) { 
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK); 
-  } else { 
-    tft.setTextColor(TFT_CYAN, TFT_BLACK); 
-  } 
-  tft.setCursor(15, 12); 
-  tft.print("State: "); 
-  tft.print(petState); 
-  tft.print("   "); // Clear trailing text artifacts 
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(15, 202);
+  tft.print("HUNGER:");
+  tft.setCursor(15, 230);
+  tft.print("HAPPY:");
+  tft.setCursor(15, 258);
+  tft.print("HEALTH:");
+}
 
-  // Draw Pet Face or Reset Button if dead 
-  drawPetFace(petState, 160, 115); 
+void updateUI(float sensorVoltage, int rawValue) {
+  // Clear and redraw the state header to prevent stale text.
+  tft.fillRect(7, 7, 226, 34, TFT_BLACK);
+  tft.setTextSize(2);
+  if (isDead) {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+  } else if (rawValue > 850) {
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  } else if (rawValue > 650) {
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  } else {
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  }
+  tft.setCursor(14, 15);
+  tft.print("State: ");
+  tft.print(petState);
 
-  // Draw three widescreen Status Bars at the bottom 
-  drawStatusBar(45, 198, 60, 10, petHunger, TFT_GREEN); 
-  drawStatusBar(145, 198, 60, 10, petHappiness, TFT_YELLOW); 
-  drawStatusBar(245, 198, 60, 10, petHealth, TFT_RED); 
+  // Pet image centered in the main portrait area.
+  drawPetFace(petState, 120, 105);
 
-  // Draw Sensor Readout at the very bottom footer 
-  tft.setTextSize(1); 
-  tft.setCursor(15, 218); 
-  tft.setTextColor(TFT_ORANGE, TFT_BLACK); 
-  if (isDead) { 
-    tft.print("PET DIED! Touch RESET to play again.  "); 
-  } else { 
-    tft.print("Raw: "); 
-    tft.print(rawValue); 
-    tft.print(" (Chill <=650 | Tipsy >650 | Happy >850)  "); 
-  } 
-} 
+  // Stack the three status bars vertically for portrait orientation.
+  drawStatusBar(65, 202, 155, 10, petHunger, TFT_GREEN);
+  drawStatusBar(65, 230, 155, 10, petHappiness, TFT_YELLOW);
+  drawStatusBar(65, 258, 155, 10, petHealth, TFT_RED);
+
+  // Sensor readout in the footer.
+  tft.fillRect(7, 284, 226, 29, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+  tft.setCursor(15, 288);
+  if (isDead) {
+    tft.print("PET DIED!");
+    tft.setCursor(15, 302);
+    tft.print("Touch RESET to play again.");
+  } else {
+    tft.print("Raw: ");
+    tft.print(rawValue);
+    tft.setCursor(15, 302);
+    tft.print("Chill<=650 Tipsy>650 Happy>850");
+  }
+}
 
 void drawStatusBar(int x, int y, int w, int h, float val, uint16_t color) { 
   tft.drawRect(x, y, w, h, TFT_WHITE); 
@@ -220,57 +220,67 @@ void drawStatusBar(int x, int y, int w, int h, float val, uint16_t color) {
   tft.fillRect(x + 1 + fillW, y + 1, (w - 2) - fillW, h - 2, TFT_BLACK); 
 } 
 
-// Helper function to draw pixel art faces or reset button 
-void drawPetFace(String state, int x, int y) { 
-  if (isDead) { 
-    // Clear face area and draw Reset Button 
-    tft.fillRect(x - 50, y - 35, 100, 60, TFT_BLACK); 
-     
-    // Draw Touch Button 
-    tft.fillRoundRect(85, 130, 150, 45, 8, TFT_BLUE); 
-    tft.drawRoundRect(85, 130, 150, 45, 8, TFT_WHITE); 
-    tft.setTextSize(2); 
-    tft.setTextColor(TFT_WHITE, TFT_BLUE); 
-    tft.setCursor(130, 144); 
-    tft.print("RESET"); 
-    return; 
-  } 
+// Helper function to draw animated pet images from pet_images.h
+void drawPetFace(String state, int x, int y) {
+  // Each animation contains four 64x64 frames stored in PROGMEM.
+  const uint16_t* frame = nullptr;
+  int frameIndex = (millis() / 250) % 4;
 
-  // Outer widescreen body container box 
-  tft.drawRoundRect(x - 55, y - 40, 110, 75, 12, TFT_WHITE); 
-  tft.fillRect(x - 45, y - 28, 90, 55, TFT_BLACK);
-   
-  if (state == "Happy :)") { 
-    // Eyes 
-    tft.fillRect(x - 28, y - 16, 12, 12, TFT_WHITE); 
-    tft.fillRect(x + 16, y - 16, 12, 12, TFT_WHITE); 
-    // Smile 
-    tft.drawFastHLine(x - 20, y + 14, 40, TFT_WHITE); 
-    tft.drawPixel(x - 21, y + 13, TFT_WHITE); 
-    tft.drawPixel(x + 21, y + 13, TFT_WHITE); 
-  }  
-  else if (state == "Tipsy B)") { 
-    // Happy/Drunk eyes ^_^ 
-    tft.setTextSize(2); 
-    tft.setTextColor(TFT_GREEN, TFT_BLACK); 
-    tft.setCursor(x - 28, y - 18); 
-    tft.print("^  ^"); 
-    // Grin 
-    tft.setCursor(x - 14, y + 4); 
-    tft.print("D"); 
-  } 
-  else if (state == "Sad :(") {
-    // Sad eyes & Frown
-    tft.fillRect(x - 28, y - 16, 12, 12, TFT_WHITE); 
-    tft.fillRect(x + 16, y - 16, 12, 12, TFT_WHITE); 
-    tft.drawFastHLine(x - 20, y + 18, 40, TFT_WHITE); 
-    tft.drawPixel(x - 21, y + 17, TFT_WHITE); 
-    tft.drawPixel(x + 21, y + 17, TFT_WHITE);
+  if (isDead || state == "DEAD X_X") {
+    switch (frameIndex) {
+      case 0: frame = dead_01; break;
+      case 1: frame = dead_02; break;
+      case 2: frame = dead_03; break;
+      default: frame = dead_04; break;
+    }
+
+    tft.fillRect(x - 48, y - 48, 96, 100, TFT_BLACK);
+    tft.pushImage(x - 32, y - 32, 64, 64, frame);
+
+    // Keep the existing reset button.
+    tft.fillRoundRect(45, 150, 150, 45, 8, TFT_BLUE);
+    tft.drawRoundRect(45, 150, 150, 45, 8, TFT_WHITE);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_WHITE, TFT_BLUE);
+    tft.setCursor(90, 164);
+    tft.print("RESET");
+    return;
   }
-  else { 
-    // Chilling ~ (Relaxed eyes and neutral mouth)
-    tft.drawFastHLine(x - 28, y - 10, 12, TFT_WHITE); 
-    tft.drawFastHLine(x + 16, y - 10, 12, TFT_WHITE); 
-    tft.drawFastHLine(x - 12, y + 12, 24, TFT_WHITE); 
-  } 
+
+  // Draw a square pet container suited to portrait orientation.
+  //tft.drawRoundRect(x - 45, y - 45, 90, 90, 12, TFT_WHITE);
+  //tft.fillRect(x - 40, y - 40, 80, 80, TFT_BLACK);
+
+  if (state == "Happy :)") {
+    switch (frameIndex) {
+      case 0: frame = happy_01; break;
+      case 1: frame = happy_02; break;
+      case 2: frame = happy_03; break;
+      default: frame = happy_04; break;
+    }
+  } else if (state == "Tipsy B)") {
+    switch (frameIndex) {
+      case 0: frame = tipsy_01; break;
+      case 1: frame = tipsy_02; break;
+      case 2: frame = tipsy_03; break;
+      default: frame = tipsy_04; break;
+    }
+  } else if (state == "Sad :(") {
+    switch (frameIndex) {
+      case 0: frame = sad_01; break;
+      case 1: frame = sad_02; break;
+      case 2: frame = sad_03; break;
+      default: frame = sad_04; break;
+    }
+  } else {
+    // Chilling state uses the meh animation frames.
+    switch (frameIndex) {
+      case 0: frame = meh_01; break;
+      case 1: frame = meh_02; break;
+      case 2: frame = meh_03; break;
+      default: frame = meh_04; break;
+    }
+  }
+
+  tft.pushImage(x - 32, y - 32, 64, 64, frame);
 }
