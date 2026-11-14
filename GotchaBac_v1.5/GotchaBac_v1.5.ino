@@ -5,6 +5,13 @@
 #include <PNGdec.h>
 #include <SD.h>
 
+#include "server_link.h"
+
+// ---------------- Server Upload ----------------
+
+unsigned long lastServerPublish = 0;
+const unsigned long serverPublishInterval = 5000;
+
 // ---------------- TFT and Touch ----------------
 
 TFT_eSPI tft = TFT_eSPI();
@@ -518,6 +525,9 @@ void setup() {
 
   Serial.println("SD card section finished");
 
+  // WiFi + server uploads (connects in the background)
+  serverLinkBegin();
+
   // Initialize CPU measurement
   cpuWindowStart = millis();
   loopWorkTime = 0;
@@ -650,6 +660,28 @@ void loop() {
     else {
       petState = "Chilling ~";
     }
+  }
+
+  // Send a snapshot to the server every 5 seconds
+  if (millis() - lastServerPublish >= serverPublishInterval) {
+
+    lastServerPublish = millis();
+
+    TelemetrySnapshot snap;
+
+    snap.raw = rawValue;
+    snap.voltage = voltage;
+    snap.hunger = petHunger;
+    snap.happiness = petHappiness;
+    snap.health = petHealth;
+    snap.battery = batteryPercent;
+    snap.cpu = cpuUsage;
+    snap.dead = isDead;
+    snap.uptimeMs = millis();
+
+    strlcpy(snap.state, petState.c_str(), sizeof(snap.state));
+
+    serverLinkPublish(snap);
   }
 
   // Render UI

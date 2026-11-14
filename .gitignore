@@ -1,0 +1,7 @@
+# Secrets
+GotchaBac_v1.5/secrets.h
+server/.env
+
+# Server
+server/node_modules/
+server/data/
