@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GotchaBac</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f4f1;
+      --card: #ffffff;
+      --text: #1c1c1a;
+      --muted: #6b6b66;
+      --line: #deded8;
+      --track: #e8e8e2;
+      --online: #2e8b57;
+      --offline: #a3a39c;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161614;
+        --card: #21211e;
+        --text: #ecece6;
+        --muted: #9a9a92;
+        --line: #33332f;
+        --track: #2c2c28;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    main { max-width: 760px; margin: 0 auto; }
+
+    h1 { margin: 0 0 4px; font-size: 22px; }
+
+    .sub { margin: 0 0 20px; color: var(--muted); }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+    }
+
+    .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+    .id { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--muted); }
+
+    .badge { font-size: 12px; font-weight: 600; color: var(--offline); }
+    .badge.online { color: var(--online); }
+
+    .state { margin: 6px 0 14px; font-size: 24px; font-weight: 600; }
+
+    .bar { margin-bottom: 10px; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    .track { height: 8px; margin-top: 3px; border-radius: 4px; background: var(--track); overflow: hidden; }
+    .fill { height: 100%; border-radius: 4px; }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 14px 0 0;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .facts dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+    .seen { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+
+    .empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>GotchaBac</h1>
+    <p class="sub" id="summary">Loading…</p>
+    <div class="grid" id="devices"></div>
+  </main>
+
+  <script>
+    const REFRESH_MS = 3000;
+
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+
+    const fmt = (value, digits = 0, suffix = '') =>
+      typeof value === 'number' ? value.toFixed(digits) + suffix : '–';
+
+    function ago(timestamp) {
+      const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+      if (seconds < 60) return seconds + 's ago';
+      if (seconds < 3600) return Math.round(seconds / 60) + ' min ago';
+      return new Date(timestamp).toLocaleString();
+    }
+
+    function bar(label, value, color) {
+      const wrap = el('div', 'bar');
+      const labels = el('div', 'bar-label');
+      labels.append(el('span', '', label), el('span', '', fmt(value, 0, '%')));
+
+      const track = el('div', 'track');
+      const fill = el('div', 'fill');
+      fill.style.width = Math.min(Math.max(value ?? 0, 0), 100) + '%';
+      fill.style.background = color;
+      track.append(fill);
+
+      wrap.append(labels, track);
+      return wrap;
+    }
+
+    function fact(label, value) {
+      const wrap = el('div');
+      wrap.append(el('dt', '', label), el('dd', '', value));
+      return wrap;
+    }
+
+    function card(device) {
+      const r = device.latest;
+      const node = el('section', 'card');
+
+      const head = el('div', 'head');
+      head.append(
+        el('span', 'id', device.deviceId),
+        el('span', 'badge' + (device.online ? ' online' : ''), device.online ? '● Online' : '○ Offline'),
+      );
+
+      const facts = el('dl', 'facts');
+      facts.append(
+        fact('MQ-3 raw', fmt(r.raw)),
+        fact('Battery', fmt(r.battery, 0, '%')),
+        fact('CPU', fmt(r.cpu, 0, '%')),
+      );
+
+      node.append(
+        head,
+        el('div', 'state', r.state ?? 'Unknown'),
+        bar('Hunger', r.hunger, '#3fa34d'),
+        bar('Happiness', r.happiness, '#d9a514'),
+        bar('Health', r.health, '#d1495b'),
+        facts,
+        el('p', 'seen', 'Last seen ' + ago(device.lastSeen)),
+      );
+
+      return node;
+    }
+
+    async function refresh() {
+      const summary = document.getElementById('summary');
+      const list = document.getElementById('devices');
+
+      try {
+        const response = await fetch('/api/devices');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const { devices } = await response.json();
+        const online = devices.filter((d) => d.online).length;
+
+        summary.textContent = devices.length
+          ? `${online} of ${devices.length} device${devices.length === 1 ? '' : 's'} online`
+          : 'No devices yet';
+
+        list.replaceChildren(
+          ...(devices.length
+            ? devices.map(card)
+            : [el('div', 'card empty', 'Waiting for the first reading from an ESP32.')]),
+        );
+      } catch (error) {
+        summary.textContent = 'Cannot reach the server (' + error.message + ')';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+  </script>
+</body>
+</html>
